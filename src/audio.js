@@ -277,136 +277,120 @@ function buildVishnu(ac) {
 }
 
 function buildShiva(ac) {
-  // Storm + realistic lightning + damaru
+  // Damru-focused: rhythmic double-tap pattern + resonant body + subtle drone
   const nodes = []
 
-  // Deep thunder bed — filtered sawtooth, very low
-  const osc1 = ac.createOscillator()
-  osc1.type = 'sawtooth'
-  osc1.frequency.value = 35
-  const lpf1 = ac.createBiquadFilter()
-  lpf1.type = 'lowpass'
-  lpf1.frequency.value = 70
-  lpf1.Q.value = 1
-  const g1 = ac.createGain()
-  g1.gain.value = 0.06
-  osc1.connect(lpf1)
-  lpf1.connect(g1)
-  g1.connect(deityGain)
-  osc1.start()
-  nodes.push(osc1, lpf1, g1)
+  // Low tonic drone — Shiva's meditative base
+  const drone = ac.createOscillator()
+  drone.type = 'sine'
+  drone.frequency.value = 68
+  const droneGain = ac.createGain()
+  droneGain.gain.value = 0.07
+  drone.connect(droneGain)
+  droneGain.connect(deityGain)
+  drone.start()
+  nodes.push(drone, droneGain)
 
-  // Wind — bandpass noise with slow modulation
-  const wind = createNoise(ac)
-  const bpf = ac.createBiquadFilter()
-  bpf.type = 'bandpass'
-  bpf.frequency.value = 300
-  bpf.Q.value = 0.3
-  const wg = ac.createGain()
-  wg.gain.value = 0.05
-  wind.connect(bpf)
-  bpf.connect(wg)
-  wg.connect(deityGain)
-  wind.start()
-  nodes.push(wind, bpf, wg)
+  // Damru membrane — sharp pitch-swept tone (high → low)
+  const membrane = ac.createOscillator()
+  membrane.type = 'triangle'
+  membrane.frequency.value = 80
+  const membraneLpf = ac.createBiquadFilter()
+  membraneLpf.type = 'lowpass'
+  membraneLpf.frequency.value = 1200
+  membraneLpf.Q.value = 2
+  const membraneGain = ac.createGain()
+  membraneGain.gain.value = 0
+  membrane.connect(membraneLpf)
+  membraneLpf.connect(membraneGain)
+  membraneGain.connect(deityGain)
+  membrane.start()
+  nodes.push(membrane, membraneLpf, membraneGain)
 
-  // Wind howl modulation
-  const lfo = ac.createOscillator()
-  lfo.type = 'sine'
-  lfo.frequency.value = 0.1
-  const lfoG = ac.createGain()
-  lfoG.gain.value = 150
-  lfo.connect(lfoG)
-  lfoG.connect(bpf.frequency)
-  lfo.start()
-  nodes.push(lfo, lfoG)
+  // Damru snap — short noise burst for the "slap" attack
+  const snap = createNoise(ac)
+  const snapBpf = ac.createBiquadFilter()
+  snapBpf.type = 'bandpass'
+  snapBpf.frequency.value = 2000
+  snapBpf.Q.value = 1.5
+  const snapGain = ac.createGain()
+  snapGain.gain.value = 0
+  snap.connect(snapBpf)
+  snapBpf.connect(snapGain)
+  snapGain.connect(deityGain)
+  snap.start()
+  nodes.push(snap, snapBpf, snapGain)
 
-  // Realistic lightning: noise source → sweeping filter → envelope
-  // Bright crack that sweeps down into deep rolling thunder
-  const lightningNoise = createNoise(ac)
-  const lightningFilter = ac.createBiquadFilter()
-  lightningFilter.type = 'lowpass'
-  lightningFilter.frequency.value = 100
-  lightningFilter.Q.value = 0.7
-  const lightningGain = ac.createGain()
-  lightningGain.gain.value = 0
-  lightningNoise.connect(lightningFilter)
-  lightningFilter.connect(lightningGain)
-  lightningGain.connect(deityGain)
-  lightningNoise.start()
-  nodes.push(lightningNoise, lightningFilter, lightningGain)
+  // Resonant body ring — damru's hollow wooden body
+  const body = ac.createOscillator()
+  body.type = 'sine'
+  body.frequency.value = 350
+  const bodyBpf = ac.createBiquadFilter()
+  bodyBpf.type = 'bandpass'
+  bodyBpf.frequency.value = 400
+  bodyBpf.Q.value = 6
+  const bodyGain = ac.createGain()
+  bodyGain.gain.value = 0
+  body.connect(bodyBpf)
+  bodyBpf.connect(bodyGain)
+  bodyGain.connect(deityGain)
+  body.start()
+  nodes.push(body, bodyBpf, bodyGain)
 
-  // Second layer for sub-bass thunder body
-  const thunderBody = createNoise(ac)
-  const thunderBpf = ac.createBiquadFilter()
-  thunderBpf.type = 'lowpass'
-  thunderBpf.frequency.value = 80
-  thunderBpf.Q.value = 2
-  const thunderBodyGain = ac.createGain()
-  thunderBodyGain.gain.value = 0
-  thunderBody.connect(thunderBpf)
-  thunderBpf.connect(thunderBodyGain)
-  thunderBodyGain.connect(deityGain)
-  thunderBody.start()
-  nodes.push(thunderBody, thunderBpf, thunderBodyGain)
-
-  function flash() {
-    if (currentDeity !== 'shiva') return
+  // Single damru strike
+  function strike(loud) {
     const now = ac.currentTime
+    const vol = loud ? 1.0 : 0.7
 
-    // Phase 1: bright crack — filter opens wide then sweeps down
-    lightningFilter.frequency.cancelScheduledValues(now)
-    lightningFilter.frequency.setValueAtTime(5000, now)
-    lightningFilter.frequency.exponentialRampToValueAtTime(2000, now + 0.05)
-    lightningFilter.frequency.exponentialRampToValueAtTime(400, now + 0.4)
-    lightningFilter.frequency.exponentialRampToValueAtTime(100, now + 2.5)
+    // Membrane: pitch sweep 280→80 Hz
+    membrane.frequency.cancelScheduledValues(now)
+    membrane.frequency.setValueAtTime(280, now)
+    membrane.frequency.exponentialRampToValueAtTime(80, now + 0.12)
 
-    // Crack envelope: instant attack, multi-phase decay
-    lightningGain.gain.cancelScheduledValues(now)
-    lightningGain.gain.setValueAtTime(0.001, now)
-    lightningGain.gain.linearRampToValueAtTime(0.2, now + 0.003)
-    lightningGain.gain.exponentialRampToValueAtTime(0.08, now + 0.06)
-    // Brief re-crack (double strike)
-    lightningGain.gain.linearRampToValueAtTime(0.12, now + 0.1)
-    lightningGain.gain.exponentialRampToValueAtTime(0.04, now + 0.3)
-    lightningGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5)
+    // Membrane envelope
+    membraneGain.gain.cancelScheduledValues(now)
+    membraneGain.gain.setValueAtTime(0.001, now)
+    membraneGain.gain.linearRampToValueAtTime(0.14 * vol, now + 0.003)
+    membraneGain.gain.exponentialRampToValueAtTime(0.04 * vol, now + 0.08)
+    membraneGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
 
-    // Phase 2: deep rolling thunder body follows ~150ms after crack
-    thunderBodyGain.gain.cancelScheduledValues(now)
-    thunderBodyGain.gain.setValueAtTime(0.001, now + 0.15)
-    thunderBodyGain.gain.linearRampToValueAtTime(0.15, now + 0.25)
-    // Rolling: multiple swells that decay
-    thunderBodyGain.gain.exponentialRampToValueAtTime(0.06, now + 0.8)
-    thunderBodyGain.gain.linearRampToValueAtTime(0.1, now + 1.2)
-    thunderBodyGain.gain.exponentialRampToValueAtTime(0.03, now + 2.0)
-    thunderBodyGain.gain.linearRampToValueAtTime(0.05, now + 2.5)
-    thunderBodyGain.gain.exponentialRampToValueAtTime(0.001, now + 4.0)
+    // Snap attack
+    snapGain.gain.cancelScheduledValues(now)
+    snapGain.gain.setValueAtTime(0.001, now)
+    snapGain.gain.linearRampToValueAtTime(0.08 * vol, now + 0.002)
+    snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04)
 
-    setTimeout(flash, 5000 + Math.random() * 10000)
+    // Body resonance ring
+    body.frequency.setValueAtTime(350 + (loud ? 30 : 0), now)
+    bodyGain.gain.cancelScheduledValues(now)
+    bodyGain.gain.setValueAtTime(0.001, now + 0.005)
+    bodyGain.gain.linearRampToValueAtTime(0.06 * vol, now + 0.01)
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
   }
-  setTimeout(flash, 2500)
 
-  // Damaru pulse — tuned tap
-  const damaru = ac.createOscillator()
-  damaru.type = 'sine'
-  damaru.frequency.value = 200
-  const damaruGain = ac.createGain()
-  damaruGain.gain.value = 0
-  damaru.connect(damaruGain)
-  damaruGain.connect(deityGain)
-  damaru.start()
-  nodes.push(damaru, damaruGain)
+  // Rhythmic pattern: "dug-dug ... dug-dug ... dug-dug-dug"
+  // Mimics the damru being twisted back and forth
+  let patternIdx = 0
+  const patterns = [
+    [0, 180],
+    [0, 180],
+    [0, 150, 300],
+  ]
 
-  function beat() {
+  function playPattern() {
     if (currentDeity !== 'shiva') return
-    const now = ac.currentTime
-    damaru.frequency.setValueAtTime(200, now)
-    damaru.frequency.exponentialRampToValueAtTime(80, now + 0.15)
-    damaruGain.gain.setValueAtTime(0.08, now)
-    damaruGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2)
-    setTimeout(beat, 4000 + Math.random() * 3000)
+    const pat = patterns[patternIdx % patterns.length]
+    pat.forEach((delay, i) => {
+      setTimeout(() => {
+        if (currentDeity !== 'shiva') return
+        strike(i === 0)
+      }, delay)
+    })
+    patternIdx++
+    const nextDelay = 1800 + Math.random() * 800
+    setTimeout(playPattern, nextDelay)
   }
-  setTimeout(beat, 3000)
+  setTimeout(playPattern, 1500)
 
   return nodes
 }
