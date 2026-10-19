@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { setVolume, initAudio, switchSound } from './audio'
 
 export default function VolumeSlider({ deity }) {
-  const [vol, setVol] = useState(0.3)
+  const [vol, setVol] = useState(0.15)
   const [started, setStarted] = useState(false)
   const [muted, setMuted] = useState(false)
 
@@ -28,7 +28,7 @@ export default function VolumeSlider({ deity }) {
       return
     }
     if (muted) {
-      setVolume(vol || 0.3)
+      setVolume(vol || 0.15)
       setMuted(false)
     } else {
       setVolume(0)
