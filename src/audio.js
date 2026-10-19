@@ -41,78 +41,137 @@ function createNoise(ac) {
 }
 
 function buildOmBackground(ac) {
-  // Persistent OM drone — always audible, shared across all deities
-  // 136.1 Hz = cosmic Om frequency (Earth year tone)
+  // AUM chanting — cycles through Aa → Uu → Mm vowel phases
+  // Mimics deep group chanting like "Om 1008 times" meditation recordings
   const nodes = []
   const omGain = ac.createGain()
-  omGain.gain.value = 0.5
+  omGain.gain.value = 0.55
   omGain.connect(masterGain)
 
-  // Fundamental — warm sine
-  const osc1 = ac.createOscillator()
-  osc1.type = 'sine'
-  osc1.frequency.value = 136.1
-  const g1 = ac.createGain()
-  g1.gain.value = 0.4
-  osc1.connect(g1)
-  g1.connect(omGain)
-  osc1.start()
-  nodes.push(osc1, g1)
+  // Rich voice source: multiple detuned sawtooths filtered to sound vocal
+  const voiceFreqs = [136.1, 136.3, 135.8, 68.05, 68.2]
+  const voiceGains = [0.18, 0.08, 0.06, 0.12, 0.05]
+  const oscs = []
+  voiceFreqs.forEach((f, i) => {
+    const osc = ac.createOscillator()
+    osc.type = i < 3 ? 'sawtooth' : 'sine'
+    osc.frequency.value = f
+    const g = ac.createGain()
+    g.gain.value = voiceGains[i]
+    osc.connect(g)
+    g.connect(omGain)
+    osc.start()
+    oscs.push(osc)
+    nodes.push(osc, g)
+  })
 
-  // Detuned chorus for richness
-  const osc2 = ac.createOscillator()
-  osc2.type = 'sine'
-  osc2.frequency.value = 136.3
-  const g2 = ac.createGain()
-  g2.gain.value = 0.2
-  osc2.connect(g2)
-  g2.connect(omGain)
-  osc2.start()
-  nodes.push(osc2, g2)
+  // Formant filter 1 — sweeps through A→U→M vowel positions
+  const formant1 = ac.createBiquadFilter()
+  formant1.type = 'bandpass'
+  formant1.frequency.value = 700
+  formant1.Q.value = 3
+  const f1Gain = ac.createGain()
+  f1Gain.gain.value = 0.25
+  nodes.push(formant1, f1Gain)
 
-  // Second detuned voice
-  const osc2b = ac.createOscillator()
-  osc2b.type = 'sine'
-  osc2b.frequency.value = 135.9
-  const g2b = ac.createGain()
-  g2b.gain.value = 0.15
-  osc2b.connect(g2b)
-  g2b.connect(omGain)
-  osc2b.start()
-  nodes.push(osc2b, g2b)
+  // Formant filter 2 — second formant for vowel realism
+  const formant2 = ac.createBiquadFilter()
+  formant2.type = 'bandpass'
+  formant2.frequency.value = 1200
+  formant2.Q.value = 4
+  const f2Gain = ac.createGain()
+  f2Gain.gain.value = 0.08
+  nodes.push(formant2, f2Gain)
 
-  // Sub-octave for body
-  const osc3 = ac.createOscillator()
-  osc3.type = 'sine'
-  osc3.frequency.value = 68.05
-  const g3 = ac.createGain()
-  g3.gain.value = 0.2
-  osc3.connect(g3)
-  g3.connect(omGain)
-  osc3.start()
-  nodes.push(osc3, g3)
+  // Nasal resonance for the "Mm" phase
+  const nasal = ac.createBiquadFilter()
+  nasal.type = 'bandpass'
+  nasal.frequency.value = 300
+  nasal.Q.value = 8
+  const nasalGain = ac.createGain()
+  nasalGain.gain.value = 0.15
+  nodes.push(nasal, nasalGain)
 
-  // Upper harmonic for presence
-  const osc4 = ac.createOscillator()
-  osc4.type = 'sine'
-  osc4.frequency.value = 272.2
-  const g4 = ac.createGain()
-  g4.gain.value = 0.06
-  osc4.connect(g4)
-  g4.connect(omGain)
-  osc4.start()
-  nodes.push(osc4, g4)
+  // Connect voice → formants → omGain
+  oscs.forEach(osc => {
+    osc.connect(formant1)
+    osc.connect(formant2)
+    osc.connect(nasal)
+  })
+  formant1.connect(f1Gain)
+  f1Gain.connect(omGain)
+  formant2.connect(f2Gain)
+  f2Gain.connect(omGain)
+  nasal.connect(nasalGain)
+  nasalGain.connect(omGain)
 
-  // Slow breath-like LFO on volume
-  const lfo = ac.createOscillator()
-  lfo.type = 'sine'
-  lfo.frequency.value = 0.06
-  const lfoGain = ac.createGain()
-  lfoGain.gain.value = 0.12
-  lfo.connect(lfoGain)
-  lfoGain.connect(omGain.gain)
-  lfo.start()
-  nodes.push(lfo, lfoGain, omGain)
+  // Breath noise — adds air/texture to the chant
+  const breath = createNoise(ac)
+  const breathFilter = ac.createBiquadFilter()
+  breathFilter.type = 'bandpass'
+  breathFilter.frequency.value = 1500
+  breathFilter.Q.value = 0.5
+  const breathGain = ac.createGain()
+  breathGain.gain.value = 0.015
+  breath.connect(breathFilter)
+  breathFilter.connect(breathGain)
+  breathGain.connect(omGain)
+  breath.start()
+  nodes.push(breath, breathFilter, breathGain)
+
+  // AUM cycle: ~6s per Om, repeating
+  // Aa (open vowel) → Uu (closed vowel) → Mm (nasal hum) → breath pause
+  let omActive = true
+  function chantCycle() {
+    if (!omActive) return
+    const now = ac.currentTime
+    const dur = 5.5
+
+    // Breath envelope: swell in, sustain, fade out
+    omGain.gain.cancelScheduledValues(now)
+    omGain.gain.setValueAtTime(0.05, now)
+    omGain.gain.linearRampToValueAtTime(0.55, now + 0.6)
+    omGain.gain.setValueAtTime(0.55, now + dur * 0.7)
+    omGain.gain.linearRampToValueAtTime(0.3, now + dur * 0.85)
+    omGain.gain.linearRampToValueAtTime(0.05, now + dur)
+
+    // "Aa" phase (0–35%): open vowel, F1≈700, F2≈1200
+    formant1.frequency.cancelScheduledValues(now)
+    formant1.frequency.setValueAtTime(700, now)
+    formant2.frequency.cancelScheduledValues(now)
+    formant2.frequency.setValueAtTime(1200, now)
+    nasalGain.gain.cancelScheduledValues(now)
+    nasalGain.gain.setValueAtTime(0.02, now)
+
+    // "Uu" phase (35–65%): closed vowel, F1≈300, F2≈700
+    const uStart = now + dur * 0.35
+    formant1.frequency.linearRampToValueAtTime(300, uStart)
+    formant2.frequency.linearRampToValueAtTime(700, uStart)
+
+    // "Mm" phase (65–100%): nasal, close formants down, boost nasal
+    const mStart = now + dur * 0.65
+    formant1.frequency.linearRampToValueAtTime(250, mStart)
+    formant2.frequency.linearRampToValueAtTime(400, mStart)
+    nasalGain.gain.linearRampToValueAtTime(0.02, uStart)
+    nasalGain.gain.linearRampToValueAtTime(0.25, mStart)
+    formant1.frequency.linearRampToValueAtTime(200, now + dur)
+    nasalGain.gain.linearRampToValueAtTime(0.3, now + dur)
+
+    // Breath texture follows envelope
+    breathGain.gain.cancelScheduledValues(now)
+    breathGain.gain.setValueAtTime(0.005, now)
+    breathGain.gain.linearRampToValueAtTime(0.02, now + 0.5)
+    breathGain.gain.linearRampToValueAtTime(0.008, now + dur * 0.6)
+    breathGain.gain.linearRampToValueAtTime(0.003, now + dur)
+
+    // Next cycle after brief silence (group takes a breath)
+    setTimeout(chantCycle, (dur + 0.8) * 1000)
+  }
+  chantCycle()
+
+  // Store cleanup flag on the gain node so stopOm can halt the cycle
+  omGain._stopCycle = () => { omActive = false }
+  nodes.push(omGain)
 
   return nodes
 }
