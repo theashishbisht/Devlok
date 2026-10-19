@@ -41,52 +41,74 @@ function createNoise(ac) {
 }
 
 function buildOmBackground(ac) {
-  // Soft continuous OM drone — shared across all deities
-  // 136.1 Hz = cosmic Om frequency (year tone)
+  // Persistent OM drone — always audible, shared across all deities
+  // 136.1 Hz = cosmic Om frequency (Earth year tone)
   const nodes = []
   const omGain = ac.createGain()
-  omGain.gain.value = 0.35
+  omGain.gain.value = 0.5
   omGain.connect(masterGain)
 
-  // Fundamental
+  // Fundamental — warm sine
   const osc1 = ac.createOscillator()
   osc1.type = 'sine'
   osc1.frequency.value = 136.1
   const g1 = ac.createGain()
-  g1.gain.value = 0.3
+  g1.gain.value = 0.4
   osc1.connect(g1)
   g1.connect(omGain)
   osc1.start()
   nodes.push(osc1, g1)
 
-  // Slight detuned chorus for warmth
+  // Detuned chorus for richness
   const osc2 = ac.createOscillator()
   osc2.type = 'sine'
   osc2.frequency.value = 136.3
   const g2 = ac.createGain()
-  g2.gain.value = 0.12
+  g2.gain.value = 0.2
   osc2.connect(g2)
   g2.connect(omGain)
   osc2.start()
   nodes.push(osc2, g2)
 
-  // Soft octave
+  // Second detuned voice
+  const osc2b = ac.createOscillator()
+  osc2b.type = 'sine'
+  osc2b.frequency.value = 135.9
+  const g2b = ac.createGain()
+  g2b.gain.value = 0.15
+  osc2b.connect(g2b)
+  g2b.connect(omGain)
+  osc2b.start()
+  nodes.push(osc2b, g2b)
+
+  // Sub-octave for body
   const osc3 = ac.createOscillator()
   osc3.type = 'sine'
   osc3.frequency.value = 68.05
   const g3 = ac.createGain()
-  g3.gain.value = 0.15
+  g3.gain.value = 0.2
   osc3.connect(g3)
   g3.connect(omGain)
   osc3.start()
   nodes.push(osc3, g3)
 
-  // Very slow breath-like LFO on volume
+  // Upper harmonic for presence
+  const osc4 = ac.createOscillator()
+  osc4.type = 'sine'
+  osc4.frequency.value = 272.2
+  const g4 = ac.createGain()
+  g4.gain.value = 0.06
+  osc4.connect(g4)
+  g4.connect(omGain)
+  osc4.start()
+  nodes.push(osc4, g4)
+
+  // Slow breath-like LFO on volume
   const lfo = ac.createOscillator()
   lfo.type = 'sine'
-  lfo.frequency.value = 0.08
+  lfo.frequency.value = 0.06
   const lfoGain = ac.createGain()
-  lfoGain.gain.value = 0.08
+  lfoGain.gain.value = 0.12
   lfo.connect(lfoGain)
   lfoGain.connect(omGain.gain)
   lfo.start()
@@ -196,10 +218,10 @@ function buildVishnu(ac) {
 }
 
 function buildShiva(ac) {
-  // Storm + lightning + damaru: layered, controlled, not harsh
+  // Storm + realistic lightning + damaru
   const nodes = []
 
-  // Deep thunder — filtered sawtooth, very low
+  // Deep thunder bed — filtered sawtooth, very low
   const osc1 = ac.createOscillator()
   osc1.type = 'sawtooth'
   osc1.frequency.value = 35
@@ -240,53 +262,72 @@ function buildShiva(ac) {
   lfo.start()
   nodes.push(lfo, lfoG)
 
-  // Lightning — short crack with exponential decay + rumble tail
-  const crackle = createNoise(ac)
-  const hpf = ac.createBiquadFilter()
-  hpf.type = 'highpass'
-  hpf.frequency.value = 3000
-  const crackGain = ac.createGain()
-  crackGain.gain.value = 0
-  crackle.connect(hpf)
-  hpf.connect(crackGain)
-  crackGain.connect(deityGain)
-  crackle.start()
-  nodes.push(crackle, hpf, crackGain)
+  // Realistic lightning: noise source → sweeping filter → envelope
+  // Bright crack that sweeps down into deep rolling thunder
+  const lightningNoise = createNoise(ac)
+  const lightningFilter = ac.createBiquadFilter()
+  lightningFilter.type = 'lowpass'
+  lightningFilter.frequency.value = 100
+  lightningFilter.Q.value = 0.7
+  const lightningGain = ac.createGain()
+  lightningGain.gain.value = 0
+  lightningNoise.connect(lightningFilter)
+  lightningFilter.connect(lightningGain)
+  lightningGain.connect(deityGain)
+  lightningNoise.start()
+  nodes.push(lightningNoise, lightningFilter, lightningGain)
 
-  // Thunder rumble tail (low noise burst after lightning)
-  const thunderNoise = createNoise(ac)
-  const thunderLpf = ac.createBiquadFilter()
-  thunderLpf.type = 'lowpass'
-  thunderLpf.frequency.value = 120
-  thunderLpf.Q.value = 1
-  const thunderGain = ac.createGain()
-  thunderGain.gain.value = 0
-  thunderNoise.connect(thunderLpf)
-  thunderLpf.connect(thunderGain)
-  thunderGain.connect(deityGain)
-  thunderNoise.start()
-  nodes.push(thunderNoise, thunderLpf, thunderGain)
+  // Second layer for sub-bass thunder body
+  const thunderBody = createNoise(ac)
+  const thunderBpf = ac.createBiquadFilter()
+  thunderBpf.type = 'lowpass'
+  thunderBpf.frequency.value = 80
+  thunderBpf.Q.value = 2
+  const thunderBodyGain = ac.createGain()
+  thunderBodyGain.gain.value = 0
+  thunderBody.connect(thunderBpf)
+  thunderBpf.connect(thunderBodyGain)
+  thunderBodyGain.connect(deityGain)
+  thunderBody.start()
+  nodes.push(thunderBody, thunderBpf, thunderBodyGain)
 
-  // Lightning flash: sharp crack then rolling thunder
   function flash() {
     if (currentDeity !== 'shiva') return
     const now = ac.currentTime
 
-    // Sharp crack
-    crackGain.gain.setValueAtTime(0, now)
-    crackGain.gain.linearRampToValueAtTime(0.15, now + 0.005)
-    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08)
+    // Phase 1: bright crack — filter opens wide then sweeps down
+    lightningFilter.frequency.cancelScheduledValues(now)
+    lightningFilter.frequency.setValueAtTime(5000, now)
+    lightningFilter.frequency.exponentialRampToValueAtTime(2000, now + 0.05)
+    lightningFilter.frequency.exponentialRampToValueAtTime(400, now + 0.4)
+    lightningFilter.frequency.exponentialRampToValueAtTime(100, now + 2.5)
 
-    // Rolling thunder follows 100ms later
-    thunderGain.gain.setValueAtTime(0, now + 0.1)
-    thunderGain.gain.linearRampToValueAtTime(0.1, now + 0.15)
-    thunderGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5)
+    // Crack envelope: instant attack, multi-phase decay
+    lightningGain.gain.cancelScheduledValues(now)
+    lightningGain.gain.setValueAtTime(0.001, now)
+    lightningGain.gain.linearRampToValueAtTime(0.2, now + 0.003)
+    lightningGain.gain.exponentialRampToValueAtTime(0.08, now + 0.06)
+    // Brief re-crack (double strike)
+    lightningGain.gain.linearRampToValueAtTime(0.12, now + 0.1)
+    lightningGain.gain.exponentialRampToValueAtTime(0.04, now + 0.3)
+    lightningGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5)
 
-    setTimeout(flash, 4000 + Math.random() * 8000)
+    // Phase 2: deep rolling thunder body follows ~150ms after crack
+    thunderBodyGain.gain.cancelScheduledValues(now)
+    thunderBodyGain.gain.setValueAtTime(0.001, now + 0.15)
+    thunderBodyGain.gain.linearRampToValueAtTime(0.15, now + 0.25)
+    // Rolling: multiple swells that decay
+    thunderBodyGain.gain.exponentialRampToValueAtTime(0.06, now + 0.8)
+    thunderBodyGain.gain.linearRampToValueAtTime(0.1, now + 1.2)
+    thunderBodyGain.gain.exponentialRampToValueAtTime(0.03, now + 2.0)
+    thunderBodyGain.gain.linearRampToValueAtTime(0.05, now + 2.5)
+    thunderBodyGain.gain.exponentialRampToValueAtTime(0.001, now + 4.0)
+
+    setTimeout(flash, 5000 + Math.random() * 10000)
   }
-  setTimeout(flash, 2000)
+  setTimeout(flash, 2500)
 
-  // Damaru pulse — tuned tap, not a sustained tone
+  // Damaru pulse — tuned tap
   const damaru = ac.createOscillator()
   damaru.type = 'sine'
   damaru.frequency.value = 200
